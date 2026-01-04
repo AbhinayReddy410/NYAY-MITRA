@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /templates/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.admin == true;
+    }
+
+    match /drafts/{userId}/{allPaths=**} {
+      allow read: if request.auth.uid == userId;
+      allow write: if false;
+    }
+  }
+}
