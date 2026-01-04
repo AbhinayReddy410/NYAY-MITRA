@@ -1,264 +1,130 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import type { User } from 'firebase/auth';
 
-import { HTTPError } from 'ky';
-import {
-  GoogleAuthProvider,
-  RecaptchaVerifier,
-  onAuthStateChanged,
-  signInWithPhoneNumber,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  type ConfirmationResult,
-  type User as FirebaseUser
-} from 'firebase/auth';
+// Lazy import to catch initialization errors
+let auth: ReturnType<typeof import('firebase/auth').getAuth> | null = null;
+let firebaseError: Error | null = null;
 
-import { ERROR_CODES, type ApiResponse, type User } from '@nyayamitra/shared';
-
-import { apiClient } from '../lib/api';
-import { firebaseAuth } from '../lib/firebase';
-
-export interface AuthUser {
-  id: string;
-  email?: string;
-  phone?: string;
-  photoURL?: string;
+try {
+  const firebase = require('@/lib/firebase');
+  auth = firebase.auth;
+} catch (error) {
+  firebaseError = error instanceof Error ? error : new Error('Firebase initialization failed');
+  console.error('Firebase initialization error:', firebaseError.message);
 }
 
-export interface AuthContextValue {
-  user: AuthUser | null;
+interface AuthContextType {
+  user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  error: Error | null;
   signInWithGoogle: () => Promise<void>;
   signInWithPhone: (phoneNumber: string) => Promise<void>;
   verifyOtp: (code: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function useAuth(): AuthContextType {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-type UserProfileResponse = User & { draftsLimit: number };
-
-const INITIAL_LOADING = true;
-const HTTP_STATUS_UNAUTHORIZED = 401;
-const HTTP_STATUS_FORBIDDEN = 403;
-const INDIA_COUNTRY_CODE = '+91';
-const RECAPTCHA_CONTAINER_ID = 'recaptcha-container';
-const RECAPTCHA_SIZE = 'invisible';
-const EMPTY_STRING = '';
-
-const GOOGLE_SIGNIN_FAILED_MESSAGE = 'Unable to sign in with Google. Please try again.';
-const PHONE_INVALID_MESSAGE = 'Please enter a valid phone number.';
-const PHONE_SIGNIN_FAILED_MESSAGE = 'Unable to send OTP. Please try again.';
-const OTP_MISSING_MESSAGE = 'Please request a new OTP.';
-const OTP_VERIFY_FAILED_MESSAGE = 'Unable to verify OTP. Please try again.';
-const PROFILE_LOAD_MESSAGE = 'Unable to load your profile.';
-const SESSION_EXPIRED_MESSAGE = 'Your session expired. Please sign in again.';
-const SIGN_OUT_MESSAGE = 'Unable to sign out. Please try again.';
-
-const AuthContext = createContext<AuthContextValue | null>(null);
-const googleProvider = new GoogleAuthProvider();
-
-function normalizeOptional(value: string | null | undefined): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-  return value;
-}
-
-function formatPhoneNumber(phoneNumber: string): string {
-  const trimmed = phoneNumber.trim();
-  if (!trimmed) {
-    return EMPTY_STRING;
-  }
-  if (trimmed.startsWith('+')) {
-    return trimmed;
-  }
-  return `${INDIA_COUNTRY_CODE}${trimmed}`;
-}
-
-function toAuthUser(profile: UserProfileResponse): AuthUser {
-  return {
-    id: profile.uid,
-    email: normalizeOptional(profile.email),
-    phone: normalizeOptional(profile.phone)
-  };
-}
-
-function toAuthUserFromFirebase(user: FirebaseUser): AuthUser {
-  return {
-    id: user.uid,
-    email: normalizeOptional(user.email),
-    phone: normalizeOptional(user.phoneNumber),
-    photoURL: normalizeOptional(user.photoURL)
-  };
-}
-
-async function fetchUserProfile(token: string): Promise<AuthUser> {
-  if (!token) {
-    throw new Error(SESSION_EXPIRED_MESSAGE);
-  }
-
-  try {
-    const response = await apiClient
-      .get('user/profile', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      .json<ApiResponse<UserProfileResponse>>();
-
-    return toAuthUser(response.data);
-  } catch (error) {
-    if (error instanceof HTTPError) {
-      const status = error.response.status;
-      if (status === HTTP_STATUS_UNAUTHORIZED || status === HTTP_STATUS_FORBIDDEN) {
-        throw new Error(SESSION_EXPIRED_MESSAGE);
-      }
-
-      const data = (await error.response.clone().json().catch((): null => null)) as
-        | { error?: { code?: string } }
-        | null;
-
-      if (data?.error?.code === ERROR_CODES.AUTH_REQUIRED || data?.error?.code === ERROR_CODES.AUTH_INVALID) {
-        throw new Error(SESSION_EXPIRED_MESSAGE);
-      }
-    }
-
-    throw new Error(PROFILE_LOAD_MESSAGE);
-  }
-}
-
 export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(INITIAL_LOADING);
-  const confirmationRef = useRef<ConfirmationResult | null>(null);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const signInWithGoogle = useCallback(async (): Promise<void> => {
-    setIsLoading(true);
-    try {
-      await signInWithPopup(firebaseAuth, googleProvider);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : GOOGLE_SIGNIN_FAILED_MESSAGE;
-      throw new Error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const signInWithPhone = useCallback(async (phoneNumber: string): Promise<void> => {
-    const formatted = formatPhoneNumber(phoneNumber);
-    if (!formatted) {
-      throw new Error(PHONE_INVALID_MESSAGE);
-    }
-    if (typeof window === 'undefined') {
-      throw new Error(PHONE_SIGNIN_FAILED_MESSAGE);
-    }
-
-    setIsLoading(true);
-    try {
-      const existing = recaptchaRef.current;
-      if (existing) {
-        existing.clear();
-        recaptchaRef.current = null;
-      }
-
-      recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, RECAPTCHA_CONTAINER_ID, {
-        size: RECAPTCHA_SIZE
-      });
-
-      const confirmation = await signInWithPhoneNumber(firebaseAuth, formatted, recaptchaRef.current);
-      confirmationRef.current = confirmation;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : PHONE_SIGNIN_FAILED_MESSAGE;
-      throw new Error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const verifyOtp = useCallback(async (code: string): Promise<void> => {
-    if (!confirmationRef.current) {
-      throw new Error(OTP_MISSING_MESSAGE);
-    }
-
-    setIsLoading(true);
-    try {
-      await confirmationRef.current.confirm(code);
-      confirmationRef.current = null;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : OTP_VERIFY_FAILED_MESSAGE;
-      throw new Error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const signOut = useCallback(async (): Promise<void> => {
-    setIsLoading(true);
-    try {
-      await firebaseSignOut(firebaseAuth);
-      setUser(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : SIGN_OUT_MESSAGE;
-      throw new Error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handleAuthStateChanged = useCallback(async (firebaseUser: FirebaseUser | null): Promise<void> => {
-    if (!firebaseUser) {
-      setUser(null);
+  useEffect(() => {
+    if (!auth || firebaseError) {
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const token = await firebaseUser.getIdToken();
-      const profile = await fetchUserProfile(token);
-      setUser(profile);
-    } catch {
-      setUser(toAuthUserFromFirebase(firebaseUser));
-    } finally {
+    const { onAuthStateChanged } = require('firebase/auth');
+    const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+      setUser(user);
       setIsLoading(false);
-    }
-  }, []);
-
-  useEffect((): (() => void) => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser): void => {
-      void handleAuthStateChanged(firebaseUser);
     });
 
-    return unsubscribe;
-  }, [handleAuthStateChanged]);
+    return () => unsubscribe();
+  }, []);
 
-  const value = useMemo<AuthContextValue>(
-    (): AuthContextValue => ({
-      user,
-      isLoading,
-      isAuthenticated: Boolean(user),
-      signInWithGoogle,
-      signInWithPhone,
-      verifyOtp,
-      signOut
-    }),
-    [user, isLoading, signInWithGoogle, signInWithPhone, verifyOtp, signOut]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('AuthContext not available');
+  // Show configuration error
+  if (firebaseError) {
+    return (
+      <div
+        style={{
+          padding: '2rem',
+          maxWidth: '600px',
+          margin: '2rem auto',
+          fontFamily: 'system-ui, sans-serif',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: '8px'
+        }}
+      >
+        <h2 style={{ color: '#dc2626', marginTop: 0 }}>Firebase Configuration Error</h2>
+        <pre
+          style={{
+            backgroundColor: '#1f2937',
+            color: '#f3f4f6',
+            padding: '1rem',
+            borderRadius: '4px',
+            overflow: 'auto',
+            fontSize: '0.875rem'
+          }}
+        >
+          {firebaseError.message}
+        </pre>
+      </div>
+    );
   }
-  return context;
+
+  const signInWithGoogle = async (): Promise<void> => {
+    if (!auth) throw new Error('Firebase not initialized');
+    const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  };
+
+  const signInWithPhone = async (phoneNumber: string): Promise<void> => {
+    throw new Error('Phone auth not implemented yet');
+  };
+
+  const verifyOtp = async (code: string): Promise<void> => {
+    throw new Error('OTP verification not implemented yet');
+  };
+
+  const handleSignOut = async (): Promise<void> => {
+    if (!auth) throw new Error('Firebase not initialized');
+    const { signOut: firebaseSignOut } = await import('firebase/auth');
+    await firebaseSignOut(auth);
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        isAuthenticated: !!user,
+        error: firebaseError,
+        signInWithGoogle,
+        signInWithPhone,
+        verifyOtp,
+        signOut: handleSignOut
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
