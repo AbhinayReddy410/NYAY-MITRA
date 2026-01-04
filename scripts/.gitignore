@@ -1,0 +1,18 @@
+# Template import artifacts
+templates/
+metadata.csv
+progress.json
+errors.json
+
+# Node modules
+node_modules/
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# Archives
+archive/

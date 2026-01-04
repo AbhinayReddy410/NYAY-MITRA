@@ -1,0 +1,11 @@
+filename,name,description,categoryId,estimatedMinutes
+sale_deed.docx,Sale Deed,Standard sale deed for property transactions,civil_001,30
+rental_agreement.docx,Rental Agreement,Residential property rental agreement,civil_001,20
+divorce_petition.docx,Divorce Petition,Mutual consent divorce petition,family_001,45
+employment_contract.docx,Employment Contract,Standard employment agreement,contracts_001,25
+power_of_attorney.docx,Power of Attorney,General power of attorney,civil_001,15
+will_testament.docx,Will and Testament,Last will and testament document,civil_001,40
+notice_to_quit.docx,Notice to Quit,Tenant eviction notice,civil_001,10
+partnership_deed.docx,Partnership Deed,Business partnership agreement,contracts_001,35
+loan_agreement.docx,Loan Agreement,Personal loan agreement,contracts_001,25
+affidavit.docx,General Affidavit,General purpose affidavit,civil_001,10
