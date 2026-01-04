@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { Context, Next } from 'hono';
+import type { CollectionReference, DocumentReference, WriteResult } from 'firebase-admin/firestore';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DRAFT_LIMITS, ERROR_CODES } from '@nyayamitra/shared';
@@ -9,27 +10,31 @@ import * as firebase from '../lib/firebase';
 import { handleError } from '../middleware/errorHandler';
 import * as documentGenerator from '../services/documentGenerator';
 import * as variableValidator from '../services/variableValidator';
+import { createMockDecodedToken } from '../test/fixtures';
+import {
+  createMockCollectionReference,
+  createMockDocumentReference,
+  createMockDocumentSnapshot,
+  createMockQuerySnapshot,
+  createMockTransaction
+} from '../test/mocks/firestore';
 import { draftsRouter } from './drafts';
 
-const authUser = vi.hoisted(() => {
-  return {
-    uid: 'user-1',
-    email: 'user@example.com',
-    name: 'Test User'
-  } as DecodedIdToken;
+const authUser = createMockDecodedToken({
+  uid: 'user-1',
+  email: 'user@example.com',
+  name: 'Test User'
 });
 
-const uuidValue = vi.hoisted(() => 'abcd1234efgh5678');
+const uuidValue = 'abcd1234efgh5678';
 
-const httpStatus = vi.hoisted(() => {
-  return {
-    ok: 200,
-    badRequest: 400,
-    unauthorized: 401,
-    paymentRequired: 402,
-    notFound: 404
-  };
-});
+const httpStatus = {
+  ok: 200,
+  badRequest: 400,
+  unauthorized: 401,
+  paymentRequired: 402,
+  notFound: 404
+} as const;
 
 vi.mock('node:crypto', () => {
   return {
@@ -40,7 +45,7 @@ vi.mock('node:crypto', () => {
 vi.mock('../middleware/auth', () => {
   return {
     authMiddleware: () => {
-      return async (c, next): Promise<Response | void> => {
+      return async (c: Context, next: Next): Promise<Response | void> => {
         const authHeader = c.req.header('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return c.json(
@@ -128,68 +133,6 @@ const DEFAULT_USAGE_COUNT = 0;
 const TOTAL_PAGES_SINGLE = 1;
 const GENERATED_VARIABLE_COUNT = 1;
 
-interface UserSnapshot {
-  exists: boolean;
-  id: string;
-  data: () => User | undefined;
-}
-
-interface UserDocRef {
-  id: string;
-  get: () => Promise<UserSnapshot>;
-  set: (data: User) => Promise<void>;
-  update: (data: Partial<User>) => Promise<void>;
-}
-
-interface UsersCollection {
-  doc: (id: string) => UserDocRef;
-}
-
-interface TemplateSnapshot {
-  exists: boolean;
-  id: string;
-  data: () => Template | undefined;
-}
-
-interface TemplatesCollection {
-  doc: (id: string) => { get: () => Promise<TemplateSnapshot> };
-}
-
-interface DraftSnapshot {
-  id: string;
-  data: () => Draft;
-}
-
-interface DraftQuerySnapshot {
-  docs: DraftSnapshot[];
-}
-
-interface DraftCountSnapshot {
-  data: () => { count: number };
-}
-
-interface DraftCountQuery {
-  get: () => Promise<DraftCountSnapshot>;
-}
-
-interface DraftQuery {
-  orderBy: (field: 'createdAt', direction: 'asc' | 'desc') => DraftQuery;
-  offset: (value: number) => DraftQuery;
-  limit: (value: number) => DraftQuery;
-  count: () => DraftCountQuery;
-  get: () => Promise<DraftQuerySnapshot>;
-}
-
-interface DraftDocRef {
-  set: (data: Draft) => Promise<void>;
-  update: (data: Partial<Draft>) => Promise<void>;
-}
-
-interface DraftsCollection {
-  doc: (id: string) => DraftDocRef;
-  orderBy: DraftQuery['orderBy'];
-}
-
 interface DraftQueryState {
   orderField?: 'createdAt';
   orderDirection?: 'asc' | 'desc';
@@ -197,64 +140,59 @@ interface DraftQueryState {
   limit?: number;
 }
 
-function createUsersCollection(store: Map<string, User>): UsersCollection {
-  return {
-    doc: (id: string) => {
-      return {
-        id,
-        get: async () => ({
-          exists: store.has(id),
-          id,
-          data: () => store.get(id)
-        }),
-        set: async (data: User) => {
-          store.set(id, data);
-        },
-        update: async (data: Partial<User>) => {
-          const existing = store.get(id);
-          if (!existing) {
-            throw new Error('User not found');
-          }
-          store.set(id, { ...existing, ...data });
+function createUsersCollection(store: Map<string, User>): CollectionReference<User> {
+  return createMockCollectionReference<User>({
+    doc: vi.fn((id?: string) => {
+      const resolvedId = id ?? 'doc-id';
+      const ref = createMockDocumentReference<User>(resolvedId);
+      ref.get = vi.fn(async () => createMockDocumentSnapshot(store.has(resolvedId), store.get(resolvedId), resolvedId));
+      ref.set = vi.fn(async (data: User) => {
+        store.set(resolvedId, data);
+        return {} as WriteResult;
+      });
+      ref.update = vi.fn(async (data: Partial<User>) => {
+        const existing = store.get(resolvedId);
+        if (!existing) {
+          throw new Error('User not found');
         }
-      };
-    }
-  };
+        store.set(resolvedId, { ...existing, ...data });
+        return {} as WriteResult;
+      }) as unknown as DocumentReference<User>['update'];
+      return ref;
+    })
+  });
 }
 
-function createTemplatesCollection(store: Map<string, Template>): TemplatesCollection {
-  return {
-    doc: (id: string) => {
-      return {
-        get: async () => ({
-          exists: store.has(id),
-          id,
-          data: () => store.get(id)
-        })
-      };
-    }
-  };
+function createTemplatesCollection(store: Map<string, Template>): CollectionReference<Template> {
+  return createMockCollectionReference<Template>({
+    doc: vi.fn((id?: string) => {
+      const resolvedId = id ?? 'doc-id';
+      const ref = createMockDocumentReference<Template>(resolvedId);
+      ref.get = vi.fn(async () =>
+        createMockDocumentSnapshot(store.has(resolvedId), store.get(resolvedId), resolvedId)
+      );
+      return ref;
+    })
+  });
 }
 
-function createDraftsQuery(store: Map<string, Draft>, state: DraftQueryState): DraftQuery {
-  const query: DraftQuery = {
-    orderBy: (field, direction) => {
+function createDraftsQuery(store: Map<string, Draft>, state: DraftQueryState): CollectionReference<Draft> {
+  const query = createMockCollectionReference<Draft>({
+    orderBy: vi.fn((field: 'createdAt', direction: 'asc' | 'desc') => {
       return createDraftsQuery(store, { ...state, orderField: field, orderDirection: direction });
-    },
-    offset: (value) => {
+    }),
+    offset: vi.fn((value: number) => {
       return createDraftsQuery(store, { ...state, offset: value });
-    },
-    limit: (value) => {
+    }),
+    limit: vi.fn((value: number) => {
       return createDraftsQuery(store, { ...state, limit: value });
-    },
-    count: () => {
-      return {
-        get: async () => ({
-          data: () => ({ count: store.size })
-        })
-      };
-    },
-    get: async () => {
+    }),
+    count: vi.fn(() => ({
+      get: async () => ({
+        data: () => ({ count: store.size })
+      })
+    })),
+    get: vi.fn(async () => {
       let items = [...store.values()];
       if (state.orderField === 'createdAt') {
         items.sort((a, b) => {
@@ -270,38 +208,36 @@ function createDraftsQuery(store: Map<string, Draft>, state: DraftQueryState): D
       if (typeof state.limit === 'number') {
         items = items.slice(EMPTY_OFFSET, state.limit);
       }
-      return {
-        docs: items.map((draft) => ({
-          id: draft.id,
-          data: () => draft
-        }))
-      };
-    }
-  };
+      return createMockQuerySnapshot(items.map((draft) => ({ id: draft.id, data: draft })));
+    })
+  });
 
   return query;
 }
 
-function createDraftsCollection(store: Map<string, Draft>): DraftsCollection {
+function createDraftsCollection(store: Map<string, Draft>): CollectionReference<Draft> {
   const baseState: DraftQueryState = { offset: EMPTY_OFFSET };
   const baseQuery = createDraftsQuery(store, baseState);
-  return {
-    doc: (id: string) => {
-      return {
-        set: async (data: Draft) => {
-          store.set(id, data);
-        },
-        update: async (data: Partial<Draft>) => {
-          const existing = store.get(id);
-          if (!existing) {
-            throw new Error('Draft not found');
-          }
-          store.set(id, { ...existing, ...data });
+  return createMockCollectionReference<Draft>({
+    doc: vi.fn((id?: string) => {
+      const resolvedId = id ?? 'doc-id';
+      const ref = createMockDocumentReference<Draft>(resolvedId);
+      ref.set = vi.fn(async (data: Draft) => {
+        store.set(resolvedId, data);
+        return {} as WriteResult;
+      });
+      ref.update = vi.fn(async (data: Partial<Draft>) => {
+        const existing = store.get(resolvedId);
+        if (!existing) {
+          throw new Error('Draft not found');
         }
-      };
-    },
+        store.set(resolvedId, { ...existing, ...data });
+        return {} as WriteResult;
+      }) as unknown as DocumentReference<Draft>['update'];
+      return ref;
+    }),
     orderBy: baseQuery.orderBy
-  };
+  });
 }
 
 function createUser(overrides: Partial<User>): User {
@@ -395,10 +331,13 @@ function addMinutes(date: Date, minutes: number): Date {
 
 function setupTransactionMock(): void {
   mockRunTransaction.mockImplementation(async (callback) => {
-    const transaction = {
-      get: async (ref: UserDocRef) => ref.get(),
-      update: async (ref: UserDocRef, data: Partial<User>) => ref.update(data)
-    };
+    const transaction = createMockTransaction();
+    const mutableTransaction = transaction as unknown as Record<string, unknown>;
+    mutableTransaction.get = vi.fn(async (ref: DocumentReference<User>) => ref.get());
+    mutableTransaction.update = vi.fn((ref: DocumentReference<User>, data: Partial<User>) => {
+      void ref.update(data);
+      return transaction;
+    });
 
     await callback(transaction);
   });

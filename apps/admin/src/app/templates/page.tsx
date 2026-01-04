@@ -11,7 +11,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { apiClient } from '../../lib/api';
-import { firebaseAuth } from '../../lib/firebase';
+import { getCurrentUserToken } from '../../lib/firebase';
 
 const HEADER_TITLE = 'Templates';
 const CREATE_NEW_LABEL = 'Create Template';
@@ -48,12 +48,7 @@ async function fetchTemplates(
   categoryId: string,
   status: string
 ): Promise<PaginatedResponse<Template>> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString()
@@ -81,12 +76,7 @@ async function fetchTemplates(
 }
 
 async function fetchCategories(): Promise<Category[]> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const response = await apiClient
     .get('categories', {
       headers: {

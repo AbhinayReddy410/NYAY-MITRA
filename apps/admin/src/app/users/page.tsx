@@ -10,7 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { apiClient } from '../../lib/api';
-import { firebaseAuth } from '../../lib/firebase';
+import { getCurrentUserToken } from '../../lib/firebase';
 
 const HEADER_TITLE = 'Users';
 const SEARCH_PLACEHOLDER = 'Search users by email or phone...';
@@ -41,12 +41,7 @@ const DEBOUNCE_DELAY = 300;
 const NUMBER_FORMAT = new Intl.NumberFormat('en-IN');
 
 async function fetchUsers(page: number, limit: number, search: string): Promise<PaginatedResponse<User>> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString()

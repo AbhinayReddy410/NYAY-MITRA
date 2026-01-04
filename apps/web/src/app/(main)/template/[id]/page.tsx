@@ -700,19 +700,19 @@ function DynamicForm({
 
 export default function TemplatePage({ params }: TemplatePageProps): JSX.Element {
   const router = useRouter();
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const templateId = params.id;
 
   const templateQuery = useQuery({
     queryKey: ['template', templateId],
     queryFn: async (): Promise<Template> => {
-      if (!user) {
+      if (!firebaseUser) {
         throw new Error(AUTH_REQUIRED_MESSAGE);
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
       return fetchTemplate(templateId, token);
     },
-    enabled: Boolean(templateId && user)
+    enabled: Boolean(templateId && firebaseUser)
   });
 
   const template = templateQuery.data;
@@ -740,7 +740,7 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
 
   const generateMutation = useMutation({
     mutationFn: async (values: FormValues): Promise<DraftResponse> => {
-      if (!user) {
+      if (!firebaseUser) {
         throw new Error(AUTH_REQUIRED_MESSAGE);
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
@@ -770,7 +770,7 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
     );
   }
 
-  if (!user || templateQuery.isLoading) {
+  if (!firebaseUser || templateQuery.isLoading) {
     return (
       <div className='flex items-center justify-center py-12'>
         <p className='text-slate-500'>{LOADING_MESSAGE}</p>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '../../../components/ui/Button';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -43,7 +43,7 @@ function formatCountdown(seconds: number): string {
   return `${minutes}:${paddedSeconds}`;
 }
 
-export default function OtpPage(): JSX.Element {
+function OtpPageContent(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { verifyOtp, signInWithPhone, isLoading } = useAuth();
@@ -297,5 +297,14 @@ export default function OtpPage(): JSX.Element {
         </Button>
       </div>
     </div>
+  );
+}
+
+
+export default function OtpPage(): JSX.Element {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <OtpPageContent />
+    </Suspense>
   );
 }

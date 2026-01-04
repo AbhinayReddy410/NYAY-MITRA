@@ -217,7 +217,7 @@ export function DashboardScreen(): JSX.Element {
   const progressRatio = hasFiniteLimit
     ? Math.min(draftsUsed / draftsLimit, PROGRESS_MAX)
     : EMPTY_COUNT;
-  const progressWidth = `${progressRatio * PERCENT_MULTIPLIER}%`;
+  const progressWidth = `${progressRatio * PERCENT_MULTIPLIER}%` as `${number}%`;
 
   const handleRefresh = useCallback(async (): Promise<void> => {
     setIsRefreshing(true);

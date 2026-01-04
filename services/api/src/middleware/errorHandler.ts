@@ -39,7 +39,8 @@ export const errorHandler = (): MiddlewareHandler => {
     try {
       await next();
     } catch (error) {
-      return handleError(error, c);
+      const resolvedError = error instanceof Error ? error : new Error('Unknown error');
+      return handleError(resolvedError, c);
     }
   };
 };

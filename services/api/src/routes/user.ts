@@ -1,6 +1,5 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, Input } from 'hono';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
@@ -8,11 +7,15 @@ import { DRAFT_LIMITS, UpdateUserRequestSchema } from '@nyayamitra/shared';
 import type { User, UserPlan } from '@nyayamitra/shared';
 
 import { users } from '../lib/firebase';
+import type { ValidatedInput } from '../lib/validator';
+import { zValidator } from '../lib/validator';
 import { authMiddleware } from '../middleware/auth';
 
 type UserVariables = { user: DecodedIdToken };
 
 type UserEnv = { Variables: UserVariables };
+
+type UpdateProfileInput = ValidatedInput<'json', typeof UpdateUserRequestSchema>;
 
 type UserRecord = {
   ref: DocumentReference<User>;
@@ -39,7 +42,7 @@ export const userRouter = new Hono<UserEnv>();
 
 userRouter.use('*', authMiddleware());
 
-function getAuthUser(c: Context<UserEnv>): DecodedIdToken {
+function getAuthUser<I extends Input>(c: Context<UserEnv, string, I>): DecodedIdToken {
   return c.get('user');
 }
 
@@ -120,7 +123,7 @@ async function getProfile(c: Context<UserEnv>): Promise<Response> {
   return c.json({ data: { ...record.data, draftsLimit } });
 }
 
-async function updateProfile(c: Context<UserEnv>): Promise<Response> {
+async function updateProfile(c: Context<UserEnv, string, UpdateProfileInput>): Promise<Response> {
   const authUser = getAuthUser(c);
   const now = new Date();
   const { displayName } = c.req.valid('json');

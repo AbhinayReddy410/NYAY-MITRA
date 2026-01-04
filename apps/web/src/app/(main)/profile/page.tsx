@@ -71,7 +71,7 @@ async function updateProfile(displayName: string, token: string): Promise<User> 
   return response.data;
 }
 
-function getDisplayName(profile: UserProfileResponse | undefined, fallback: string): string {
+function getDisplayName(profile: User | UserProfileResponse | undefined, fallback: string): string {
   if (!profile) {
     return fallback;
   }
@@ -90,7 +90,7 @@ function getDisplayName(profile: UserProfileResponse | undefined, fallback: stri
   return fallback;
 }
 
-function getContactLabel(profile: UserProfileResponse | undefined): string {
+function getContactLabel(profile: User | UserProfileResponse | undefined): string {
   if (!profile) {
     return CONTACT_FALLBACK;
   }
@@ -133,29 +133,29 @@ function getPlanLabel(plan: UserPlan | undefined): string {
 }
 
 export default function ProfilePage(): JSX.Element {
-  const { user, signOut } = useAuth();
+  const { profile: authProfile, firebaseUser, signOut } = useAuth();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [nameDraft, setNameDraft] = useState<string>('');
   const [nameError, setNameError] = useState<string>('');
 
-  const profileQueryKey = ['profile', user?.id] as const;
+  const profileQueryKey = ['profile', firebaseUser?.uid] as const;
 
   const profileQuery = useQuery({
     queryKey: profileQueryKey,
     queryFn: async (): Promise<UserProfileResponse> => {
-      if (!user) {
+      if (!firebaseUser) {
         throw new Error(AUTH_REQUIRED_MESSAGE);
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
       return fetchProfile(token);
     },
-    enabled: Boolean(user)
+    enabled: Boolean(firebaseUser)
   });
 
   const updateMutation = useMutation({
     mutationFn: async (displayName: string): Promise<User> => {
-      if (!user) {
+      if (!firebaseUser) {
         throw new Error(AUTH_REQUIRED_MESSAGE);
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
@@ -172,35 +172,37 @@ export default function ProfilePage(): JSX.Element {
     }
   });
 
-  const profile = profileQuery.data;
+  const profileData = profileQuery.data ?? authProfile ?? null;
   const displayName = useMemo(
-    (): string => getDisplayName(profile, user?.email ?? user?.phone ?? DEFAULT_NAME),
-    [profile, user?.email, user?.phone]
+    (): string => getDisplayName(profileData ?? undefined, profileData?.email ?? profileData?.phone ?? DEFAULT_NAME),
+    [profileData]
   );
-  const contactLabel = useMemo((): string => getContactLabel(profile), [profile]);
+  const contactLabel = useMemo((): string => getContactLabel(profileData ?? undefined), [profileData]);
   const initials = useMemo((): string => getInitials(displayName), [displayName]);
-  const photoUrl = user?.photoURL ?? '';
+  const photoUrl = firebaseUser?.photoURL ?? '';
 
-  const draftsLimit = profile?.draftsLimit ?? EMPTY_COUNT;
-  const draftsUsed = profile?.draftsUsedThisMonth ?? EMPTY_COUNT;
+  const draftsLimit: number = (profileData && 'draftsLimit' in profileData && typeof profileData.draftsLimit === 'number')
+    ? profileData.draftsLimit
+    : EMPTY_COUNT;
+  const draftsUsed = profileData?.draftsUsedThisMonth ?? EMPTY_COUNT;
   const hasFiniteLimit = Number.isFinite(draftsLimit) && draftsLimit > EMPTY_COUNT;
   const limitLabel = hasFiniteLimit ? `${draftsLimit}` : UNLIMITED_LABEL;
-  const planLabel = getPlanLabel(profile?.plan);
-  const planBadge = PLAN_BADGE[profile?.plan ?? 'free'];
-  const showUpgrade = profile?.plan === 'free';
+  const planLabel = getPlanLabel(profileData?.plan);
+  const planBadge = PLAN_BADGE[profileData?.plan ?? 'free'];
+  const showUpgrade = profileData?.plan === 'free';
 
-  const isInitialLoading = !user || profileQuery.isLoading;
+  const isInitialLoading = !firebaseUser || profileQuery.isLoading;
   const hasError = Boolean(profileQuery.error);
   const errorMessage = profileQuery.error instanceof Error ? profileQuery.error.message : PROFILE_ERROR_MESSAGE;
 
   const handleOpenEdit = useCallback((): void => {
-    if (!profile) {
+    if (!profileData) {
       return;
     }
-    setNameDraft(profile.displayName);
+    setNameDraft(profileData.displayName);
     setNameError('');
     setIsEditing(true);
-  }, [profile]);
+  }, [profileData]);
 
   const handleCloseEdit = useCallback((): void => {
     if (updateMutation.isPending) {

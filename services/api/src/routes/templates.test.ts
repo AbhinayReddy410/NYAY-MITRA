@@ -1,11 +1,18 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
+import type { CollectionReference } from 'firebase-admin/firestore';
 
 import type { PaginatedResponse, Template } from '@nyayamitra/shared';
 
 import * as firebase from '../lib/firebase';
 import * as typesense from '../lib/typesense';
 import { handleError } from '../middleware/errorHandler';
+import {
+  createMockCollectionReference,
+  createMockDocumentReference,
+  createMockDocumentSnapshot,
+  createMockQuerySnapshot
+} from '../test/mocks/firestore';
 import { templatesRouter } from './templates';
 
 vi.mock('../lib/firebase', () => {
@@ -32,31 +39,6 @@ interface QueryState {
   limit?: number;
 }
 
-interface QuerySnapshot<T> {
-  docs: Array<{ id: string; data: () => T }>;
-}
-
-interface CountSnapshot {
-  data: () => { count: number };
-}
-
-interface CountQuery {
-  get: () => Promise<CountSnapshot>;
-}
-
-interface Query<T> {
-  where: (field: FilterField, op: '==', value: FilterValue) => Query<T>;
-  offset: (value: number) => Query<T>;
-  limit: (value: number) => Query<T>;
-  count: () => CountQuery;
-  get: () => Promise<QuerySnapshot<T>>;
-}
-
-interface TemplatesCollection<T> {
-  where: Query<T>['where'];
-  doc: (id: string) => { get: () => Promise<{ exists: boolean; id: string; data: () => T | undefined }> };
-}
-
 function applyFilters(items: Template[], state: QueryState): Template[] {
   return items.filter((item) => {
     return state.filters.every((filter) => {
@@ -71,28 +53,26 @@ function applyFilters(items: Template[], state: QueryState): Template[] {
   });
 }
 
-function createTemplatesQuery(items: Template[], state: QueryState): Query<Template> {
-  const query: Query<Template> = {
-    where: (field, _op, value) => {
+function createTemplatesQuery(items: Template[], state: QueryState): CollectionReference<Template> {
+  const query: CollectionReference<Template> = createMockCollectionReference<Template>({
+    where: vi.fn((field: FilterField, _op: '==', value: FilterValue) => {
       return createTemplatesQuery(items, {
         ...state,
         filters: [...state.filters, { field, value }]
       });
-    },
-    offset: (value) => {
+    }),
+    offset: vi.fn((value: number) => {
       return createTemplatesQuery(items, { ...state, offset: value });
-    },
-    limit: (value) => {
+    }),
+    limit: vi.fn((value: number) => {
       return createTemplatesQuery(items, { ...state, limit: value });
-    },
-    count: () => {
-      return {
-        get: async () => ({
-          data: () => ({ count: applyFilters(items, state).length })
-        })
-      };
-    },
-    get: async () => {
+    }),
+    count: vi.fn(() => ({
+      get: async () => ({
+        data: () => ({ count: applyFilters(items, state).length })
+      })
+    })),
+    get: vi.fn(async () => {
       let result = applyFilters(items, state);
       if (state.offset > 0) {
         result = result.slice(state.offset);
@@ -100,36 +80,28 @@ function createTemplatesQuery(items: Template[], state: QueryState): Query<Templ
       if (typeof state.limit === 'number') {
         result = result.slice(0, state.limit);
       }
-      return {
-        docs: result.map((item) => ({
-          id: item.id,
-          data: () => item
-        }))
-      };
-    }
-  };
+      return createMockQuerySnapshot(result.map((item) => ({ id: item.id, data: item })));
+    })
+  });
 
   return query;
 }
 
-function createTemplatesCollection(items: Template[]): TemplatesCollection<Template> {
+function createTemplatesCollection(items: Template[]): CollectionReference<Template> {
   const baseState: QueryState = { filters: [], offset: 0 };
   const baseQuery = createTemplatesQuery(items, baseState);
-  return {
+  return createMockCollectionReference<Template>({
     where: baseQuery.where,
-    doc: (id: string) => {
-      return {
-        get: async () => {
-          const match = items.find((item) => item.id === id);
-          return {
-            exists: Boolean(match),
-            id,
-            data: () => match
-          };
-        }
-      };
-    }
-  };
+    doc: vi.fn((id?: string) => {
+      const resolvedId = id ?? 'doc-id';
+      const ref = createMockDocumentReference<Template>(resolvedId);
+      ref.get = vi.fn(async () => {
+        const match = items.find((item) => item.id === resolvedId);
+        return createMockDocumentSnapshot(Boolean(match), match, resolvedId);
+      });
+      return ref;
+    })
+  });
 }
 
 function createTemplate(overrides: Partial<Template>): Template {

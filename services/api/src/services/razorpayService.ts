@@ -34,6 +34,9 @@ type WebhookEvent = {
   };
 };
 
+type SubscriptionEntity = NonNullable<WebhookEvent['payload']['subscription']>['entity'];
+type PaymentEntity = NonNullable<WebhookEvent['payload']['payment']>['entity'];
+
 const RAZORPAY_PRO_PLAN_ID = 'plan_pro_monthly';
 const RAZORPAY_UNLIMITED_PLAN_ID = 'plan_unlimited_monthly';
 const RAZORPAY_WEBHOOK_SECRET = env.RAZORPAY_KEY_SECRET;
@@ -113,7 +116,7 @@ export async function cancelSubscription(subscriptionId: string, userId: string)
   });
 }
 
-async function handleSubscriptionActivated(subscriptionEntity: WebhookEvent['payload']['subscription']['entity']): Promise<void> {
+async function handleSubscriptionActivated(subscriptionEntity: SubscriptionEntity): Promise<void> {
   if (!subscriptionEntity?.id || !subscriptionEntity?.plan_id) {
     return;
   }
@@ -137,7 +140,7 @@ async function handleSubscriptionActivated(subscriptionEntity: WebhookEvent['pay
   });
 }
 
-async function handleSubscriptionCharged(paymentEntity: WebhookEvent['payload']['payment']['entity']): Promise<void> {
+async function handleSubscriptionCharged(paymentEntity: PaymentEntity): Promise<void> {
   if (!paymentEntity?.subscription_id || paymentEntity?.status !== 'captured') {
     return;
   }
@@ -157,7 +160,7 @@ async function handleSubscriptionCharged(paymentEntity: WebhookEvent['payload'][
   });
 }
 
-async function handleSubscriptionCancelled(subscriptionEntity: WebhookEvent['payload']['subscription']['entity']): Promise<void> {
+async function handleSubscriptionCancelled(subscriptionEntity: SubscriptionEntity): Promise<void> {
   if (!subscriptionEntity?.id) {
     return;
   }
@@ -179,7 +182,7 @@ async function handleSubscriptionCancelled(subscriptionEntity: WebhookEvent['pay
   });
 }
 
-async function handleSubscriptionHalted(subscriptionEntity: WebhookEvent['payload']['subscription']['entity']): Promise<void> {
+async function handleSubscriptionHalted(subscriptionEntity: SubscriptionEntity): Promise<void> {
   if (!subscriptionEntity?.id) {
     return;
   }

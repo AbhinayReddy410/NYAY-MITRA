@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 export const CreateDraftRequestSchema = z.object({
   templateId: z.string().min(1),

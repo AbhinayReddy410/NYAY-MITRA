@@ -1,16 +1,17 @@
-import { zValidator } from '@hono/zod-validator';
 import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, Input } from 'hono';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import type { DocumentReference } from 'firebase-admin/firestore';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 import { CreateDraftRequestSchema, DRAFT_LIMITS, ERROR_CODES } from '@nyayamitra/shared';
 import type { Draft, PaginatedResponse, Template, TemplateVariable, User, UserPlan } from '@nyayamitra/shared';
 
 import { ApiError, notFound, validationError } from '../lib/errors';
 import { db, getSignedUrl, getTemplateFile, templates, uploadDraft, userDrafts, users } from '../lib/firebase';
+import type { ValidatedInput } from '../lib/validator';
+import { zValidator } from '../lib/validator';
 import { authMiddleware } from '../middleware/auth';
 import { generateDocument } from '../services/documentGenerator';
 import { validateVariables } from '../services/variableValidator';
@@ -54,9 +55,13 @@ const historyQuerySchema = z.object({
 
 export const draftsRouter = new Hono<DraftEnv>();
 
+type DraftCreateInput = ValidatedInput<'json', typeof CreateDraftRequestSchema>;
+
+type DraftHistoryInput = ValidatedInput<'query', typeof historyQuerySchema>;
+
 draftsRouter.use('*', authMiddleware());
 
-function getAuthUser(c: Context<DraftEnv>): DecodedIdToken {
+function getAuthUser<I extends Input>(c: Context<DraftEnv, string, I>): DecodedIdToken {
   return c.get('user');
 }
 
@@ -149,7 +154,7 @@ async function incrementDraftUsage(userRef: DocumentReference<User>): Promise<vo
   });
 }
 
-async function createDraft(c: Context<DraftEnv>): Promise<Response> {
+async function createDraft(c: Context<DraftEnv, string, DraftCreateInput>): Promise<Response> {
   const authUser = getAuthUser(c);
   const now = new Date();
   const timestamp = now.getTime();
@@ -217,7 +222,7 @@ async function createDraft(c: Context<DraftEnv>): Promise<Response> {
   });
 }
 
-async function listHistory(c: Context<DraftEnv>): Promise<Response> {
+async function listHistory(c: Context<DraftEnv, string, DraftHistoryInput>): Promise<Response> {
   const authUser = getAuthUser(c);
   const { page, limit } = c.req.valid('query');
   const now = new Date();

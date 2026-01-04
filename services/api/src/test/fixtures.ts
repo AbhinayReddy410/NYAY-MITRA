@@ -1,19 +1,24 @@
+import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { Firestore } from 'firebase-admin/firestore';
+
 import type { Category, Template, User, TemplateVariable } from '@nyayamitra/shared';
 
 export function createTestUser(overrides?: Partial<User>): User {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const resetDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   return {
     uid: 'test-user-123',
     email: 'test@example.com',
-    phoneNumber: null,
+    phone: '',
     displayName: 'Test User',
-    photoURL: null,
     plan: 'free',
     draftsUsedThisMonth: 0,
-    draftsResetDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    subscriptionId: null,
+    draftsResetDate: resetDate,
+    subscriptionId: '',
     subscriptionStatus: 'none',
-    createdAt: new Date(),
-    lastLoginAt: new Date(),
+    createdAt: nowIso,
+    lastLoginAt: nowIso,
     ...overrides,
   };
 }
@@ -33,6 +38,7 @@ export function createTestCategory(overrides?: Partial<Category>): Category {
 }
 
 export function createTestTemplate(overrides?: Partial<Template>): Template {
+  const nowIso = new Date().toISOString();
   return {
     id: 'template-001',
     categoryId: 'cat-civil',
@@ -51,8 +57,7 @@ export function createTestTemplate(overrides?: Partial<Template>): Template {
     estimatedMinutes: 10,
     isActive: true,
     usageCount: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: nowIso,
     ...overrides,
   };
 }
@@ -63,12 +68,20 @@ export function createTestVariable(overrides?: Partial<TemplateVariable>): Templ
     label: 'Field Label',
     type: 'STRING',
     required: false,
+    maxLength: 0,
+    minLength: 0,
+    pattern: '',
+    options: [],
+    placeholder: '',
+    helpText: '',
+    section: 'default',
     order: 1,
+    defaultValue: null,
     ...overrides,
   };
 }
 
-export async function seedTestData(db: any): Promise<void> {
+export async function seedTestData(db: Firestore): Promise<void> {
   const batch = db.batch();
 
   // Seed categories
@@ -105,7 +118,7 @@ export function createMockDecodedToken(overrides?: {
   email?: string;
   phone_number?: string;
   name?: string;
-}): any {
+}): DecodedIdToken {
   return {
     uid: overrides?.uid ?? 'test-user-123',
     email: overrides?.email ?? 'test@example.com',

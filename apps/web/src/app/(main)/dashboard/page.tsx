@@ -50,30 +50,30 @@ async function fetchUserProfile(token: string): Promise<UserWithDraftsLimit> {
 }
 
 export default function DashboardPage(): JSX.Element {
-  const { user: authUser } = useAuth();
+  const { firebaseUser } = useAuth();
 
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async (): Promise<Category[]> => {
-      if (!authUser) {
+      if (!firebaseUser) {
         throw new Error('Not authenticated');
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
       return fetchCategories(token);
     },
-    enabled: Boolean(authUser)
+    enabled: Boolean(firebaseUser)
   });
 
   const userQuery = useQuery({
     queryKey: ['user', 'profile'],
     queryFn: async (): Promise<UserWithDraftsLimit> => {
-      if (!authUser) {
+      if (!firebaseUser) {
         throw new Error('Not authenticated');
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
       return fetchUserProfile(token);
     },
-    enabled: Boolean(authUser)
+    enabled: Boolean(firebaseUser)
   });
 
   const draftsLimit = useMemo((): number => {

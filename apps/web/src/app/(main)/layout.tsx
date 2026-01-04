@@ -25,7 +25,7 @@ type MainLayoutProps = {
 
 export default function MainLayout({ children }: MainLayoutProps): JSX.Element {
   const pathname = usePathname();
-  const { signOut, user } = useAuth();
+  const { signOut, profile } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   const handleSignOut = useCallback(async (): Promise<void> => {
@@ -74,8 +74,8 @@ export default function MainLayout({ children }: MainLayoutProps): JSX.Element {
           </nav>
 
           <div className='mt-auto border-t border-slate-200 pt-4'>
-            {user?.email || user?.phone ? (
-              <p className='text-sm text-slate-500 truncate'>{user.email || user.phone}</p>
+            {profile?.email || profile?.phone ? (
+              <p className='text-sm text-slate-500 truncate'>{profile.email || profile.phone}</p>
             ) : null}
             <button
               className='mt-2 w-full rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-200 transition'
@@ -128,8 +128,8 @@ export default function MainLayout({ children }: MainLayoutProps): JSX.Element {
                 })}
               </nav>
               <div className='mt-4 border-t border-slate-200 pt-4'>
-                {user?.email || user?.phone ? (
-                  <p className='text-sm text-slate-500 truncate'>{user.email || user.phone}</p>
+                {profile?.email || profile?.phone ? (
+                  <p className='text-sm text-slate-500 truncate'>{profile.email || profile.phone}</p>
                 ) : null}
                 <button
                   className='mt-2 w-full rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-200 transition'

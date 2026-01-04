@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 
 import { AdminLayout } from '../../components/AdminLayout';
 import { Card } from '../../components/ui/Card';
-import { firebaseAuth } from '../../lib/firebase';
+import { getCurrentUserToken } from '../../lib/firebase';
 import { apiClient } from '../../lib/api';
 
 type AdminStats = {
@@ -32,12 +32,7 @@ const CURRENCY_FORMAT = new Intl.NumberFormat('en-IN', {
 const NUMBER_FORMAT = new Intl.NumberFormat('en-IN');
 
 async function fetchAdminStats(): Promise<AdminStats> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const response = await apiClient
     .get('admin/stats', {
       headers: {

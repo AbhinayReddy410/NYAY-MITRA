@@ -1,13 +1,13 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, Input } from 'hono';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { z } from 'zod';
+import { z } from 'zod/v3';
 
 import { ERROR_CODES } from '@nyayamitra/shared';
-import type { UserPlan } from '@nyayamitra/shared';
 
 import { ApiError } from '../lib/errors';
+import type { ValidatedInput } from '../lib/validator';
+import { zValidator } from '../lib/validator';
 import { authMiddleware } from '../middleware/auth';
 import { cancelSubscription, createSubscription, processWebhookEvent, verifyWebhookSignature } from '../services/razorpayService';
 
@@ -55,16 +55,20 @@ const cancelSubscriptionSchema = z.object({
 
 export const paymentsRouter = new Hono<PaymentEnv>();
 
-function getAuthUser(c: Context<PaymentEnv>): DecodedIdToken {
+type CreateSubscriptionInput = ValidatedInput<'json', typeof createSubscriptionSchema>;
+
+type CancelSubscriptionInput = ValidatedInput<'json', typeof cancelSubscriptionSchema>;
+
+function getAuthUser<I extends Input>(c: Context<PaymentEnv, string, I>): DecodedIdToken {
   return c.get('user');
 }
 
-async function handleCreateSubscription(c: Context<PaymentEnv>): Promise<Response> {
+async function handleCreateSubscription(c: Context<PaymentEnv, string, CreateSubscriptionInput>): Promise<Response> {
   const authUser = getAuthUser(c);
   const { planId } = c.req.valid('json');
   const userId = authUser.uid;
 
-  const result = await createSubscription(userId, planId as UserPlan);
+  const result = await createSubscription(userId, planId);
 
   const response: SubscriptionResponse = {
     subscriptionId: result.subscriptionId,
@@ -74,7 +78,7 @@ async function handleCreateSubscription(c: Context<PaymentEnv>): Promise<Respons
   return c.json({ data: response });
 }
 
-async function handleCancelSubscription(c: Context<PaymentEnv>): Promise<Response> {
+async function handleCancelSubscription(c: Context<PaymentEnv, string, CancelSubscriptionInput>): Promise<Response> {
   const authUser = getAuthUser(c);
   const { subscriptionId } = c.req.valid('json');
   const userId = authUser.uid;

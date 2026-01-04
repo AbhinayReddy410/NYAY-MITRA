@@ -10,7 +10,7 @@ import {
   type User as FirebaseUser
 } from 'firebase/auth';
 
-import { firebaseAuth } from '../lib/firebase';
+import { getFirebaseAuth } from '../lib/firebase';
 
 export interface AdminUser {
   id: string;
@@ -64,12 +64,17 @@ export function AdminAuthProvider({ children }: AdminAuthProviderProps): JSX.Ele
   const signIn = useCallback(async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
-      const credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const auth = getFirebaseAuth();
+      if (!auth) {
+        throw new Error('Firebase not initialized');
+      }
+
+      const credential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = credential.user;
 
       const isAdmin = await checkAdminClaim(firebaseUser);
       if (!isAdmin) {
-        await firebaseSignOut(firebaseAuth);
+        await firebaseSignOut(auth);
         throw new Error(NOT_ADMIN_MESSAGE);
       }
     } catch (error) {
@@ -86,7 +91,10 @@ export function AdminAuthProvider({ children }: AdminAuthProviderProps): JSX.Ele
   const signOut = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     try {
-      await firebaseSignOut(firebaseAuth);
+      const auth = getFirebaseAuth();
+      if (auth) {
+        await firebaseSignOut(auth);
+      }
       setUser(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : SIGN_OUT_MESSAGE;
@@ -107,7 +115,10 @@ export function AdminAuthProvider({ children }: AdminAuthProviderProps): JSX.Ele
     try {
       const isAdmin = await checkAdminClaim(firebaseUser);
       if (!isAdmin) {
-        await firebaseSignOut(firebaseAuth);
+        const auth = getFirebaseAuth();
+        if (auth) {
+          await firebaseSignOut(auth);
+        }
         setUser(null);
         setIsLoading(false);
         return;
@@ -115,7 +126,10 @@ export function AdminAuthProvider({ children }: AdminAuthProviderProps): JSX.Ele
 
       setUser(toAdminUser(firebaseUser));
     } catch {
-      await firebaseSignOut(firebaseAuth);
+      const auth = getFirebaseAuth();
+      if (auth) {
+        await firebaseSignOut(auth);
+      }
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -123,7 +137,13 @@ export function AdminAuthProvider({ children }: AdminAuthProviderProps): JSX.Ele
   }, []);
 
   useEffect((): (() => void) => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser): void => {
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      setIsLoading(false);
+      return () => {};
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser): void => {
       void handleAuthStateChanged(firebaseUser);
     });
 

@@ -13,7 +13,7 @@ import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
 import { apiClient } from '../../../lib/api';
-import { firebaseAuth } from '../../../lib/firebase';
+import { getCurrentUserToken } from '../../../lib/firebase';
 
 const HEADER_TITLE = 'Create Template';
 const BACK_LABEL = 'Back';
@@ -52,12 +52,7 @@ type ParsedVariable = {
 };
 
 async function fetchCategories(): Promise<Category[]> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const response = await apiClient
     .get('categories', {
       headers: {
@@ -193,12 +188,7 @@ export default function NewTemplatePage(): JSX.Element {
       setError('');
 
       try {
-        const currentUser = firebaseAuth.currentUser;
-        if (!currentUser) {
-          throw new Error('Not authenticated');
-        }
-
-        const token = await currentUser.getIdToken();
+        const token = await getCurrentUserToken();
         const formData = new FormData();
         formData.append('file', file);
         formData.append('name', name.trim());

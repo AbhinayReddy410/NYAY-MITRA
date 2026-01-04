@@ -1,13 +1,14 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
-import type { Context } from 'hono';
-import { z } from 'zod';
+import type { Context, Env } from 'hono';
+import { z } from 'zod/v3';
 
 import type { PaginatedResponse, Template } from '@nyayamitra/shared';
 
 import { notFound } from '../lib/errors';
 import { templates } from '../lib/firebase';
 import { searchTemplates } from '../lib/typesense';
+import type { ValidatedInput } from '../lib/validator';
+import { zValidator } from '../lib/validator';
 
 type TemplateSummary = Omit<Template, 'variables' | 'templateFileURL'>;
 
@@ -30,6 +31,10 @@ const paramsSchema = z.object({
 
 export const templatesRouter = new Hono();
 
+type TemplateListInput = ValidatedInput<'query', typeof listQuerySchema>;
+
+type TemplateParamInput = ValidatedInput<'param', typeof paramsSchema>;
+
 function toSummary(template: Template, id: string): TemplateSummary {
   const { variables: _variables, templateFileURL: _file, id: _id, ...rest } = template;
   return { ...rest, id };
@@ -43,7 +48,7 @@ function buildFilterBy(categoryId: string | undefined): string {
   return filters.join(' && ');
 }
 
-async function listTemplates(c: Context): Promise<Response> {
+async function listTemplates(c: Context<Env, string, TemplateListInput>): Promise<Response> {
   const { categoryId, search, page, limit } = c.req.valid('query');
 
   if (search) {
@@ -87,7 +92,7 @@ async function listTemplates(c: Context): Promise<Response> {
   return c.json(response);
 }
 
-async function getTemplate(c: Context): Promise<Response> {
+async function getTemplate(c: Context<Env, string, TemplateParamInput>): Promise<Response> {
   const { id } = c.req.valid('param');
   const doc = await templates().doc(id).get();
 

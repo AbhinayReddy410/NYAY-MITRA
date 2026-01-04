@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import type { DecodedIdToken } from 'firebase-admin/auth';
+import type { Context, Next } from 'hono';
+import type { CollectionReference, DocumentReference, WriteResult } from 'firebase-admin/firestore';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DRAFT_LIMITS } from '@nyayamitra/shared';
@@ -7,28 +8,26 @@ import type { User, UserPlan } from '@nyayamitra/shared';
 
 import * as firebase from '../lib/firebase';
 import { handleError } from '../middleware/errorHandler';
+import { createMockDecodedToken } from '../test/fixtures';
+import { createMockCollectionReference, createMockDocumentReference, createMockDocumentSnapshot } from '../test/mocks/firestore';
 import { userRouter } from './user';
 
-const authUser = vi.hoisted(() => {
-  return {
-    uid: 'user-1',
-    email: 'user@example.com',
-    phone_number: '+911234567890',
-    name: 'Test User'
-  } as DecodedIdToken;
+const authUser = createMockDecodedToken({
+  uid: 'user-1',
+  email: 'user@example.com',
+  phone_number: '+911234567890',
+  name: 'Test User'
 });
 
-const httpStatus = vi.hoisted(() => {
-  return {
-    ok: 200,
-    unauthorized: 401
-  };
-});
+const httpStatus = {
+  ok: 200,
+  unauthorized: 401
+} as const;
 
 vi.mock('../middleware/auth', () => {
   return {
     authMiddleware: () => {
-      return async (c, next): Promise<Response | void> => {
+      return async (c: Context, next: Next): Promise<Response | void> => {
         const authHeader = c.req.header('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return c.json(
@@ -66,22 +65,6 @@ const HTTP_UNAUTHORIZED = httpStatus.unauthorized;
 const FIRST_DAY_OF_MONTH = 1;
 const NEXT_MONTH_OFFSET = 1;
 
-interface UserSnapshot {
-  exists: boolean;
-  id: string;
-  data: () => User | undefined;
-}
-
-interface UserDocRef {
-  get: () => Promise<UserSnapshot>;
-  set: (data: User) => Promise<void>;
-  update: (data: Partial<User>) => Promise<void>;
-}
-
-interface UsersCollection {
-  doc: (id: string) => UserDocRef;
-}
-
 function startOfMonthUtc(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), FIRST_DAY_OF_MONTH));
 }
@@ -90,28 +73,29 @@ function nextMonthStartUtc(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + NEXT_MONTH_OFFSET, FIRST_DAY_OF_MONTH));
 }
 
-function createUsersCollection(store: Map<string, User>): UsersCollection {
-  return {
-    doc: (id: string) => {
-      return {
-        get: async () => ({
-          exists: store.has(id),
-          id,
-          data: () => store.get(id)
-        }),
-        set: async (data: User) => {
-          store.set(id, data);
-        },
-        update: async (data: Partial<User>) => {
-          const existing = store.get(id);
-          if (!existing) {
-            throw new Error('User not found');
-          }
-          store.set(id, { ...existing, ...data });
+function createUsersCollection(store: Map<string, User>): CollectionReference<User> {
+  return createMockCollectionReference<User>({
+    doc: vi.fn((id?: string) => {
+      const resolvedId = id ?? 'doc-id';
+      const ref = createMockDocumentReference<User>(resolvedId);
+      ref.get = vi.fn(async () =>
+        createMockDocumentSnapshot(store.has(resolvedId), store.get(resolvedId), resolvedId)
+      );
+      ref.set = vi.fn(async (data: User) => {
+        store.set(resolvedId, data);
+        return {} as WriteResult;
+      });
+      ref.update = vi.fn(async (data: Partial<User>) => {
+        const existing = store.get(resolvedId);
+        if (!existing) {
+          throw new Error('User not found');
         }
-      };
-    }
-  };
+        store.set(resolvedId, { ...existing, ...data });
+        return {} as WriteResult;
+      }) as unknown as DocumentReference<User>['update'];
+      return ref;
+    })
+  });
 }
 
 function createUser(overrides: Partial<User>): User {

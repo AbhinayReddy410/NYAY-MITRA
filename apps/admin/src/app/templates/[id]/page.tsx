@@ -11,7 +11,7 @@ import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
 import { apiClient } from '../../../lib/api';
-import { firebaseAuth } from '../../../lib/firebase';
+import { getCurrentUserToken } from '../../../lib/firebase';
 
 const HEADER_TITLE = 'Edit Template';
 const BACK_LABEL = 'Back';
@@ -46,12 +46,7 @@ type TemplateFormData = {
 };
 
 async function fetchTemplate(templateId: string): Promise<Template> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const response = await apiClient
     .get(`admin/templates/${templateId}`, {
       headers: {
@@ -64,12 +59,7 @@ async function fetchTemplate(templateId: string): Promise<Template> {
 }
 
 async function fetchCategories(): Promise<Category[]> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const response = await apiClient
     .get('categories', {
       headers: {
@@ -82,12 +72,7 @@ async function fetchCategories(): Promise<Category[]> {
 }
 
 async function updateTemplate(templateId: string, data: TemplateFormData, file?: File): Promise<void> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
 
   if (file) {
     const formData = new FormData();

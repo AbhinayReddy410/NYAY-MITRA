@@ -68,7 +68,7 @@ function getCategoryName(templates: TemplateSummary[], fallback: string): string
 }
 
 export default function CategoryPage({ params }: CategoryPageProps): JSX.Element {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const categoryId = params.id;
   const [searchValue, setSearchValue] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -76,7 +76,7 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
   const templatesQuery = useInfiniteQuery({
     queryKey: ['templates', categoryId, debouncedSearch],
     queryFn: async ({ pageParam = PAGE_START }): Promise<PaginatedResponse<TemplateSummary>> => {
-      if (!user) {
+      if (!firebaseUser) {
         throw new Error(AUTH_REQUIRED_MESSAGE);
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
@@ -89,7 +89,7 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
       }
       return undefined;
     },
-    enabled: Boolean(categoryId && user)
+    enabled: Boolean(categoryId && firebaseUser)
   });
 
   const templates = useMemo(
@@ -103,7 +103,7 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
     [fallbackCategoryName, templates]
   );
 
-  const isInitialLoading = !user || templatesQuery.isLoading;
+  const isInitialLoading = !firebaseUser || templatesQuery.isLoading;
   const isFetchingMore = templatesQuery.isFetchingNextPage;
   const hasError = Boolean(templatesQuery.error);
   const errorMessage =

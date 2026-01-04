@@ -10,7 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { apiClient } from '../../lib/api';
-import { firebaseAuth } from '../../lib/firebase';
+import { getCurrentUserToken } from '../../lib/firebase';
 
 const HEADER_TITLE = 'Categories';
 const CREATE_LABEL = 'Create Category';
@@ -62,12 +62,7 @@ const INITIAL_MODAL_STATE: ModalState = {
 };
 
 async function fetchCategories(): Promise<Category[]> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   const response = await apiClient
     .get('categories', {
       headers: {
@@ -80,12 +75,7 @@ async function fetchCategories(): Promise<Category[]> {
 }
 
 async function createCategory(data: CategoryFormData): Promise<void> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   await apiClient.post('admin/categories', {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -96,12 +86,7 @@ async function createCategory(data: CategoryFormData): Promise<void> {
 }
 
 async function updateCategory(categoryId: string, data: CategoryFormData): Promise<void> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   await apiClient.put(`admin/categories/${categoryId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -112,12 +97,7 @@ async function updateCategory(categoryId: string, data: CategoryFormData): Promi
 }
 
 async function deleteCategory(categoryId: string): Promise<void> {
-  const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) {
-    throw new Error('Not authenticated');
-  }
-
-  const token = await currentUser.getIdToken();
+  const token = await getCurrentUserToken();
   await apiClient.delete(`admin/categories/${categoryId}`, {
     headers: {
       Authorization: `Bearer ${token}`

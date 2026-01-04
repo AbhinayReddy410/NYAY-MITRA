@@ -1,22 +1,16 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { User } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+import type { Auth, User as FirebaseUser } from 'firebase/auth';
 
-// Lazy import to catch initialization errors
-let auth: ReturnType<typeof import('firebase/auth').getAuth> | null = null;
-let firebaseError: Error | null = null;
+import type { ApiResponse, User as DomainUser } from '@nyayamitra/shared';
 
-try {
-  const firebase = require('@/lib/firebase');
-  auth = firebase.auth;
-} catch (error) {
-  firebaseError = error instanceof Error ? error : new Error('Firebase initialization failed');
-  console.error('Firebase initialization error:', firebaseError.message);
-}
+import { apiClient } from '@/lib/api';
 
 interface AuthContextType {
-  user: User | null;
+  firebaseUser: FirebaseUser | null;
+  profile: DomainUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   error: Error | null;
@@ -40,88 +34,133 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+async function fetchProfile(token: string): Promise<DomainUser> {
+  const response = await apiClient
+    .get('user/profile', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    .json<ApiResponse<DomainUser>>();
+
+  return response.data;
+}
+
 export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [firebaseAuth, setFirebaseAuth] = useState<Auth | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [profile, setProfile] = useState<DomainUser | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [firebaseError, setFirebaseError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (!auth || firebaseError) {
-      setIsLoading(false);
+    let isMounted = true;
+
+    const initFirebase = async (): Promise<void> => {
+      try {
+        const { getFirebaseAuth, getFirebaseError } = await import('@/lib/firebase');
+        if (!isMounted) {
+          return;
+        }
+
+        const auth = getFirebaseAuth();
+        const error = getFirebaseError();
+
+        if (error) {
+          setFirebaseError(error);
+          setIsLoading(false);
+          return;
+        }
+
+        setFirebaseAuth(auth);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        const resolved = error instanceof Error ? error : new Error('Firebase initialization failed');
+        setFirebaseError(resolved);
+        setIsLoading(false);
+      }
+    };
+
+    void initFirebase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!firebaseAuth) {
+      if (firebaseError) {
+        setIsLoading(false);
+      }
       return;
     }
 
-    const { onAuthStateChanged } = require('firebase/auth');
-    const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-      setUser(user);
-      setIsLoading(false);
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+      setFirebaseUser(user);
+
+      if (!user) {
+        setProfile(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const token = await user.getIdToken();
+        const data = await fetchProfile(token);
+        setProfile(data);
+      } catch {
+        setProfile(null);
+      } finally {
+        setIsLoading(false);
+      }
     });
 
     return () => unsubscribe();
-  }, []);
-
-  // Show configuration error
-  if (firebaseError) {
-    return (
-      <div
-        style={{
-          padding: '2rem',
-          maxWidth: '600px',
-          margin: '2rem auto',
-          fontFamily: 'system-ui, sans-serif',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '8px'
-        }}
-      >
-        <h2 style={{ color: '#dc2626', marginTop: 0 }}>Firebase Configuration Error</h2>
-        <pre
-          style={{
-            backgroundColor: '#1f2937',
-            color: '#f3f4f6',
-            padding: '1rem',
-            borderRadius: '4px',
-            overflow: 'auto',
-            fontSize: '0.875rem'
-          }}
-        >
-          {firebaseError.message}
-        </pre>
-      </div>
-    );
-  }
+  }, [firebaseAuth, firebaseError]);
 
   const signInWithGoogle = async (): Promise<void> => {
-    if (!auth) throw new Error('Firebase not initialized');
+    if (!firebaseAuth) {
+      throw new Error('Firebase not initialized');
+    }
     const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    await signInWithPopup(firebaseAuth, provider);
   };
 
   const signInWithPhone = async (phoneNumber: string): Promise<void> => {
+    void phoneNumber;
     throw new Error('Phone auth not implemented yet');
   };
 
   const verifyOtp = async (code: string): Promise<void> => {
+    void code;
     throw new Error('OTP verification not implemented yet');
   };
 
-  const handleSignOut = async (): Promise<void> => {
-    if (!auth) throw new Error('Firebase not initialized');
+  const signOut = async (): Promise<void> => {
+    if (!firebaseAuth) {
+      throw new Error('Firebase not initialized');
+    }
     const { signOut: firebaseSignOut } = await import('firebase/auth');
-    await firebaseSignOut(auth);
+    await firebaseSignOut(firebaseAuth);
   };
 
   return (
     <AuthContext.Provider
       value={{
-        user,
+        firebaseUser,
+        profile,
         isLoading,
-        isAuthenticated: !!user,
+        isAuthenticated: Boolean(firebaseUser),
         error: firebaseError,
         signInWithGoogle,
         signInWithPhone,
         verifyOtp,
-        signOut: handleSignOut
+        signOut
       }}
     >
       {children}

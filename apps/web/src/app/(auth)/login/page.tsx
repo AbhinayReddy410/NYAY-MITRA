@@ -79,18 +79,21 @@ export default function LoginPage(): JSX.Element {
   }, [router, sanitizedPhone, signInWithPhone]);
 
   return (
-    <div className='w-full'>
+    <div className='w-full' data-testid='login-page'>
       <div className='flex flex-col px-2'>
         <div className='mt-8 flex flex-col items-center'>
           <div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-900 text-white text-xl font-semibold'>
             NM
           </div>
-          <h1 className='mt-5 text-center text-2xl font-semibold text-slate-900'>{TITLE}</h1>
+          <h1 className='mt-5 text-center text-2xl font-semibold text-slate-900' data-testid='login-heading'>
+            {TITLE}
+          </h1>
         </div>
 
         <div className='mt-10'>
           <Button
             className={`w-full ${GOOGLE_BUTTON_COLOR}`}
+            data-testid='google-signin-button'
             disabled={isBusy}
             onClick={handleGooglePress}
             type='button'
@@ -108,6 +111,7 @@ export default function LoginPage(): JSX.Element {
             <span className='mr-2 text-sm text-slate-500'>{PHONE_PREFIX}</span>
             <input
               className='flex-1 text-sm text-slate-900 outline-none placeholder:text-slate-400'
+              data-testid='phone-input'
               maxLength={PHONE_TOTAL_DIGITS}
               onChange={handlePhoneChange}
               placeholder={PHONE_PLACEHOLDER}
@@ -118,6 +122,7 @@ export default function LoginPage(): JSX.Element {
 
           <Button
             className={`mt-4 w-full ${PRIMARY_BUTTON_COLOR}`}
+            data-testid='send-otp-button'
             disabled={isBusy}
             onClick={handleOtpPress}
             type='button'
@@ -125,7 +130,11 @@ export default function LoginPage(): JSX.Element {
             {isOtpLoading ? 'Sending...' : OTP_LABEL}
           </Button>
 
-          {errorMessage ? <p className='mt-4 text-sm text-red-600'>{errorMessage}</p> : null}
+          {errorMessage ? (
+            <p className='mt-4 text-sm text-red-600' data-testid='error-message'>
+              {errorMessage}
+            </p>
+          ) : null}
         </div>
 
         <div id='recaptcha-container' className='mt-6' />

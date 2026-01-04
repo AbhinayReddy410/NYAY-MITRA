@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import type { Context, Next } from 'hono';
+import type { CollectionReference } from 'firebase-admin/firestore';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Category } from '@nyayamitra/shared';
@@ -6,12 +8,13 @@ import type { Category } from '@nyayamitra/shared';
 import { authRequired } from '../lib/errors';
 import * as firebase from '../lib/firebase';
 import { handleError } from '../middleware/errorHandler';
+import { createMockCollectionReference, createMockQuerySnapshot } from '../test/mocks/firestore';
 import { categoriesRouter } from './categories';
 
 vi.mock('../middleware/auth', () => {
   return {
     authMiddleware: () => {
-      return async (c, next): Promise<Response | void> => {
+      return async (c: Context, next: Next): Promise<Response | void> => {
         const authHeader = c.req.header('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           throw authRequired();
@@ -28,16 +31,6 @@ vi.mock('../lib/firebase', () => {
   };
 });
 
-interface QuerySnapshot<T> {
-  docs: Array<{ id: string; data: () => T }>;
-}
-
-interface Query<T> {
-  where: (field: string, op: '==', value: boolean) => Query<T>;
-  orderBy: (field: string, direction: 'asc' | 'desc') => Query<T>;
-  get: () => Promise<QuerySnapshot<T>>;
-}
-
 interface QueryState {
   filterField?: string;
   filterValue?: boolean;
@@ -45,21 +38,20 @@ interface QueryState {
   orderDirection?: 'asc' | 'desc';
 }
 
-function createMockQuery(items: Category[]): Query<Category> {
+function createMockQuery(items: Category[]): CollectionReference<Category> {
   const state: QueryState = {};
-
-  const query: Query<Category> = {
-    where: (field, _op, value) => {
+  const query: CollectionReference<Category> = createMockCollectionReference<Category>({
+    where: vi.fn((field: string, _op: '==', value: boolean) => {
       state.filterField = field;
       state.filterValue = value;
       return query;
-    },
-    orderBy: (field, direction) => {
+    }),
+    orderBy: vi.fn((field: string, direction: 'asc' | 'desc') => {
       state.orderField = field;
       state.orderDirection = direction;
       return query;
-    },
-    get: async () => {
+    }),
+    get: vi.fn(async () => {
       let result = [...items];
 
       if (state.filterField === 'isActive' && typeof state.filterValue === 'boolean') {
@@ -73,14 +65,9 @@ function createMockQuery(items: Category[]): Query<Category> {
         });
       }
 
-      return {
-        docs: result.map((item) => ({
-          id: item.id,
-          data: () => item
-        }))
-      };
-    }
-  };
+      return createMockQuerySnapshot(result.map((item) => ({ id: item.id, data: item })));
+    })
+  });
 
   return query;
 }

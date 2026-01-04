@@ -63,16 +63,16 @@ async function deleteDraft(draftId: string, token: string): Promise<void> {
 }
 
 export default function HistoryPage(): JSX.Element {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const queryClient = useQueryClient();
   const [deletingDraftIds, setDeletingDraftIds] = useState<Set<string>>(() => new Set());
 
-  const draftQueryKey = useMemo(() => ['drafts', user?.id] as const, [user?.id]);
+  const draftQueryKey = useMemo(() => ['drafts', firebaseUser?.uid] as const, [firebaseUser?.uid]);
 
   const draftsQuery = useInfiniteQuery({
     queryKey: draftQueryKey,
     queryFn: async ({ pageParam = PAGE_START }): Promise<PaginatedResponse<DraftSummary>> => {
-      if (!user) {
+      if (!firebaseUser) {
         throw new Error(AUTH_REQUIRED_MESSAGE);
       }
       const token = await fetch('/api/auth/token').then((res) => res.text());
@@ -85,7 +85,7 @@ export default function HistoryPage(): JSX.Element {
       }
       return undefined;
     },
-    enabled: Boolean(user)
+    enabled: Boolean(firebaseUser)
   });
 
   const drafts = useMemo(
@@ -93,7 +93,7 @@ export default function HistoryPage(): JSX.Element {
     [draftsQuery.data]
   );
 
-  const isInitialLoading = !user || draftsQuery.isLoading;
+  const isInitialLoading = !firebaseUser || draftsQuery.isLoading;
   const isFetchingMore = draftsQuery.isFetchingNextPage;
   const hasError = Boolean(draftsQuery.error);
   const errorMessage = draftsQuery.error instanceof Error ? draftsQuery.error.message : ERROR_MESSAGE;
@@ -134,7 +134,7 @@ export default function HistoryPage(): JSX.Element {
 
   const handleDelete = useCallback(
     async (draftId: string): Promise<void> => {
-      if (!user || deletingDraftIds.has(draftId)) {
+      if (!firebaseUser || deletingDraftIds.has(draftId)) {
         return;
       }
 
@@ -162,7 +162,7 @@ export default function HistoryPage(): JSX.Element {
         });
       }
     },
-    [deletingDraftIds, removeDraftFromCache, user]
+    [deletingDraftIds, firebaseUser, removeDraftFromCache]
   );
 
   const handleLoadMore = useCallback((): void => {

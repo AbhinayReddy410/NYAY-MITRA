@@ -90,18 +90,14 @@ function buildStringSchema(variable: TemplateVariable): z.ZodTypeAny {
     }
   }
 
-  if (!variable.required) {
-    schema = schema.optional();
-  }
+  const finalSchema = variable.required ? schema : schema.optional();
 
-  return z.preprocess(emptyStringToUndefined, schema);
+  return z.preprocess(emptyStringToUndefined, finalSchema);
 }
 
 function buildNumberSchema(variable: TemplateVariable): z.ZodTypeAny {
-  let schema = z.number({ required_error: REQUIRED_MESSAGE, invalid_type_error: INVALID_NUMBER_MESSAGE });
-  if (!variable.required) {
-    schema = schema.optional();
-  }
+  const schema = z.number({ required_error: REQUIRED_MESSAGE, invalid_type_error: INVALID_NUMBER_MESSAGE });
+  const finalSchema = variable.required ? schema : schema.optional();
 
   return z.preprocess((value: unknown) => {
     if (value === undefined || value === null || value === EMPTY_STRING) {
@@ -115,14 +111,12 @@ function buildNumberSchema(variable: TemplateVariable): z.ZodTypeAny {
       return Number.parseFloat(trimmed);
     }
     return value;
-  }, schema);
+  }, finalSchema);
 }
 
 function buildDateSchema(variable: TemplateVariable): z.ZodTypeAny {
-  let schema = z.date({ required_error: REQUIRED_MESSAGE, invalid_type_error: INVALID_DATE_MESSAGE });
-  if (!variable.required) {
-    schema = schema.optional();
-  }
+  const schema = z.date({ required_error: REQUIRED_MESSAGE, invalid_type_error: INVALID_DATE_MESSAGE });
+  const finalSchema = variable.required ? schema : schema.optional();
 
   return z.preprocess((value: unknown) => {
     if (value === undefined || value === null || value === EMPTY_STRING) {
@@ -136,37 +130,33 @@ function buildDateSchema(variable: TemplateVariable): z.ZodTypeAny {
       return parsed;
     }
     return value;
-  }, schema);
+  }, finalSchema);
 }
 
 function buildPhoneSchema(variable: TemplateVariable): z.ZodTypeAny {
-  let schema = z
+  const schema = z
     .string({ required_error: REQUIRED_MESSAGE })
     .trim()
     .regex(PHONE_REGEX, { message: INVALID_PHONE_MESSAGE });
 
-  if (!variable.required) {
-    schema = schema.optional();
-  }
+  const finalSchema = variable.required ? schema : schema.optional();
 
-  return z.preprocess(emptyStringToUndefined, schema);
+  return z.preprocess(emptyStringToUndefined, finalSchema);
 }
 
 function buildEmailSchema(variable: TemplateVariable): z.ZodTypeAny {
-  let schema = z
+  const schema = z
     .string({ required_error: REQUIRED_MESSAGE })
     .trim()
     .regex(EMAIL_REGEX, { message: INVALID_EMAIL_MESSAGE });
 
-  if (!variable.required) {
-    schema = schema.optional();
-  }
+  const finalSchema = variable.required ? schema : schema.optional();
 
-  return z.preprocess(emptyStringToUndefined, schema);
+  return z.preprocess(emptyStringToUndefined, finalSchema);
 }
 
 function buildSelectSchema(variable: TemplateVariable): z.ZodTypeAny {
-  let schema = z
+  const schema = z
     .string({ required_error: REQUIRED_MESSAGE })
     .trim()
     .min(1, { message: REQUIRED_MESSAGE })
@@ -174,20 +164,14 @@ function buildSelectSchema(variable: TemplateVariable): z.ZodTypeAny {
       message: INVALID_OPTION_MESSAGE
     });
 
-  if (!variable.required) {
-    schema = schema.optional();
-  }
+  const finalSchema = variable.required ? schema : schema.optional();
 
-  return z.preprocess(emptyStringToUndefined, schema);
+  return z.preprocess(emptyStringToUndefined, finalSchema);
 }
 
 function buildMultiSelectSchema(variable: TemplateVariable): z.ZodTypeAny {
-  let schema = z.array(z.string());
-  if (variable.required) {
-    schema = schema.min(1, { message: REQUIRED_MESSAGE });
-  } else {
-    schema = schema.optional();
-  }
+  const baseSchema = z.array(z.string());
+  const schema = variable.required ? baseSchema.min(1, { message: REQUIRED_MESSAGE }) : baseSchema.optional();
 
   return schema.refine(
     (values) => {

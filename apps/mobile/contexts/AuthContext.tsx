@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import auth, { type FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import Constants from 'expo-constants';
 import { HTTPError } from 'ky';
 
 import { ERROR_CODES, type ApiResponse, type User } from '@nyayamitra/shared';
@@ -36,7 +37,13 @@ const INITIAL_LOADING = true;
 const INDIA_COUNTRY_CODE = '+91';
 const HTTP_STATUS_UNAUTHORIZED = 401;
 const HTTP_STATUS_FORBIDDEN = 403;
-const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_FIREBASE_WEB_CLIENT_ID ?? '';
+type ExpoExtra = {
+  apiUrl?: string;
+  firebaseWebClientId?: string;
+};
+
+const extra = Constants.expoConfig?.extra as ExpoExtra | undefined;
+const GOOGLE_WEB_CLIENT_ID = extra?.firebaseWebClientId ?? '';
 
 const GOOGLE_CONFIG_MISSING_MESSAGE = 'Google sign-in is not configured. Please try again later.';
 const GOOGLE_SIGNIN_FAILED_MESSAGE = 'Unable to sign in with Google. Please try again.';
@@ -182,7 +189,13 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       }
 
       GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
-      const { idToken } = await GoogleSignin.signIn();
+      const signInResult = await GoogleSignin.signIn();
+      if (signInResult.type !== 'success') {
+        throw new Error(GOOGLE_SIGNIN_CANCELLED_MESSAGE);
+      }
+
+      const tokens = await GoogleSignin.getTokens();
+      const idToken = tokens.idToken;
       if (!idToken) {
         throw new Error(GOOGLE_SIGNIN_FAILED_MESSAGE);
       }
@@ -232,6 +245,9 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       }
 
       const userCredential = await confirmation.confirm(trimmed);
+      if (!userCredential) {
+        throw new Error(OTP_VERIFY_FAILED_MESSAGE);
+      }
       confirmationRef.current = null;
       const profile = await loadProfile(userCredential.user);
       setUser(profile);

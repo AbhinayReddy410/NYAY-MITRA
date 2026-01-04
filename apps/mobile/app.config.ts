@@ -10,12 +10,13 @@ const config = ({ config: baseConfig }: ConfigContext): ExpoConfig => {
     slug: APP_SLUG,
     plugins: ['expo-router'],
     extra: {
-      EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL ?? '',
-      EXPO_PUBLIC_FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
-      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
-      EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? ''
+      apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
+      firebaseWebClientId: process.env.EXPO_PUBLIC_FIREBASE_WEB_CLIENT_ID ?? '',
+      firebaseApiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
+      firebaseAuthDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
+      firebaseProjectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? ''
     }
   };
 };
 
-export = config;
+export default config;
