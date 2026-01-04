@@ -48,6 +48,33 @@ export function getFirebaseApp(): FirebaseApp | null {
 export function getFirebaseAuth(): Auth | null {
   if (auth) return auth;
 
+  // Check for E2E test mock
+  if (typeof window !== 'undefined' && (window as any).__FIREBASE_MOCK_USER__) {
+    const mockUser = (window as any).__FIREBASE_MOCK_USER__;
+    auth = {
+      app: { name: '[DEFAULT]', options: {} } as any,
+      currentUser: mockUser,
+      name: 'mock-auth',
+      config: {} as any,
+      languageCode: null,
+      tenantId: null,
+      settings: {} as any,
+      onAuthStateChanged: (callback: (user: any) => void) => {
+        setTimeout(() => callback(mockUser), 0);
+        return () => {};
+      },
+      beforeAuthStateChanged: () => () => {},
+      onIdTokenChanged: (callback: (user: any) => void) => {
+        setTimeout(() => callback(mockUser), 0);
+        return () => {};
+      },
+      updateCurrentUser: async () => {},
+      useDeviceLanguage: () => {},
+      signOut: async () => {},
+    } as any;
+    return auth;
+  }
+
   const firebaseApp = getFirebaseApp();
   if (!firebaseApp) return null;
 

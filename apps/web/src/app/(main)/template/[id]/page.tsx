@@ -764,7 +764,7 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
 
   if (!templateId) {
     return (
-      <Card>
+      <Card data-testid='error'>
         <p className='text-sm text-red-600'>{ERROR_MESSAGE}</p>
       </Card>
     );
@@ -772,7 +772,7 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
 
   if (!firebaseUser || templateQuery.isLoading) {
     return (
-      <div className='flex items-center justify-center py-12'>
+      <div className='flex items-center justify-center py-12' data-testid='loading'>
         <p className='text-slate-500'>{LOADING_MESSAGE}</p>
       </div>
     );
@@ -781,7 +781,7 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
   if (templateQuery.isError) {
     const message = templateQuery.error instanceof Error ? templateQuery.error.message : ERROR_MESSAGE;
     return (
-      <Card>
+      <Card data-testid='error'>
         <p className='text-sm text-red-600'>{message}</p>
         <button
           className='mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800'
@@ -796,7 +796,7 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
 
   if (!template) {
     return (
-      <Card>
+      <Card data-testid='error'>
         <p className='text-sm text-slate-500'>{TEMPLATE_EMPTY_MESSAGE}</p>
       </Card>
     );
@@ -812,7 +812,7 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
   }
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-6' data-testid='template-page'>
       <div>
         <h1 className='text-3xl font-semibold text-slate-900'>{template.name}</h1>
         <p className='mt-2 text-sm text-slate-500'>{template.description}</p>
@@ -821,9 +821,9 @@ export default function TemplatePage({ params }: TemplatePageProps): JSX.Element
       <Card>
         <DynamicForm control={control} errors={errors} schema={variables} />
 
-        {mutationError ? <p className='mt-4 text-xs text-red-600'>{mutationError}</p> : null}
+        {mutationError ? <p className='mt-4 text-xs text-red-600' data-testid='generation-error'>{mutationError}</p> : null}
         <div className='mt-6'>
-          <Button className='w-full lg:w-auto' disabled={isDisabled} onClick={handleGenerate} type='button'>
+          <Button className='w-full lg:w-auto' disabled={isDisabled} onClick={handleGenerate} type='button' data-testid='generate-button'>
             {isGenerating ? LOADING_MESSAGE : GENERATE_LABEL}
           </Button>
         </div>

@@ -135,7 +135,7 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
 
   if (isInitialLoading) {
     return (
-      <div className='flex items-center justify-center py-12'>
+      <div className='flex items-center justify-center py-12' data-testid='loading'>
         <p className='text-slate-500'>{LOADING_MESSAGE}</p>
       </div>
     );
@@ -143,7 +143,7 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
 
   if (hasError) {
     return (
-      <Card>
+      <Card data-testid='error'>
         <p className='text-sm text-red-600'>{errorMessage}</p>
         <button
           className='mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800'
@@ -157,7 +157,7 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
   }
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-6' data-testid='category-page'>
       <div>
         <h1 className='text-3xl font-semibold text-slate-900'>{categoryName}</h1>
       </div>
@@ -170,6 +170,7 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
           placeholder={SEARCH_PLACEHOLDER}
           type='text'
           value={searchValue}
+          data-testid='template-search'
         />
       </div>
 
@@ -179,9 +180,9 @@ export default function CategoryPage({ params }: CategoryPageProps): JSX.Element
           <p className='text-sm text-slate-500'>{EMPTY_MESSAGE}</p>
         </Card>
       ) : (
-        <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
+        <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3' data-testid='templates-list'>
           {templates.map((template) => (
-            <Link key={template.id} href={`/template/${template.id}`}>
+            <Link key={template.id} href={`/template/${template.id}`} data-testid={`template-${template.id}`}>
               <Card className='h-full transition hover:shadow-md hover:border-slate-300 cursor-pointer'>
                 <div className='flex flex-col'>
                   <h3 className='text-base font-semibold text-slate-900'>{template.name}</h3>

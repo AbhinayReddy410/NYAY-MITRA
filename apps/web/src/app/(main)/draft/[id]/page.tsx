@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { Suspense, useCallback, useMemo } from 'react';
 
 import { Button } from '../../../../components/ui/Button';
 import { Card } from '../../../../components/ui/Card';
@@ -34,7 +34,7 @@ function formatTime(value: Date): string {
   return value.toLocaleTimeString(DATE_LOCALE, TIME_OPTIONS);
 }
 
-export default function DraftPage({ params }: DraftPageProps): JSX.Element {
+function DraftPageContent({ params }: DraftPageProps): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = params.id;
@@ -68,7 +68,7 @@ export default function DraftPage({ params }: DraftPageProps): JSX.Element {
   const errorMessage = !hasDownloadUrl ? DOWNLOAD_LINK_MISSING_MESSAGE : '';
 
   return (
-    <div className='flex items-center justify-center py-12'>
+    <div className='flex items-center justify-center py-12' data-testid='draft-success-page'>
       <Card className='w-full max-w-lg'>
         <div className='flex flex-col items-center text-center'>
           <div className='flex h-16 w-16 items-center justify-center rounded-full bg-green-500'>
@@ -83,7 +83,7 @@ export default function DraftPage({ params }: DraftPageProps): JSX.Element {
             </svg>
           </div>
 
-          <h1 className='mt-5 text-2xl font-semibold text-slate-900'>{SUCCESS_TITLE}</h1>
+          <h1 className='mt-5 text-2xl font-semibold text-slate-900' data-testid='success-heading'>{SUCCESS_TITLE}</h1>
           <h2 className='mt-2 text-base font-semibold text-slate-900'>{templateLabel}</h2>
           <p className='mt-2 text-sm text-slate-500'>
             {GENERATED_PREFIX} {formattedDate} at {formattedTime}
@@ -95,6 +95,7 @@ export default function DraftPage({ params }: DraftPageProps): JSX.Element {
               disabled={!hasDownloadUrl}
               onClick={handleDownload}
               type='button'
+              data-testid='download-button'
             >
               {DOWNLOAD_LABEL}
             </Button>
@@ -110,12 +111,21 @@ export default function DraftPage({ params }: DraftPageProps): JSX.Element {
             >
               {GENERATE_ANOTHER_LABEL}
             </button>
-            <Link className='text-sm text-slate-600 hover:text-slate-900' href='/dashboard'>
+            <Link className='text-sm text-slate-600 hover:text-slate-900' href='/dashboard' data-testid='dashboard-link'>
               {DASHBOARD_LABEL}
             </Link>
           </div>
         </div>
       </Card>
     </div>
+  );
+}
+
+
+export default function DraftPage({ params }: DraftPageProps): JSX.Element {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <DraftPageContent params={params} />
+    </Suspense>
   );
 }

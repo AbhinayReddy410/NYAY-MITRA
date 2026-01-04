@@ -105,7 +105,7 @@ export default function DashboardPage(): JSX.Element {
 
   if (categoriesQuery.isLoading) {
     return (
-      <div className='flex items-center justify-center py-12'>
+      <div className='flex items-center justify-center py-12' data-testid='loading'>
         <p className='text-slate-500'>{LOADING_MESSAGE}</p>
       </div>
     );
@@ -113,7 +113,7 @@ export default function DashboardPage(): JSX.Element {
 
   if (categoriesQuery.error) {
     return (
-      <Card>
+      <Card data-testid='error'>
         <p className='text-sm text-red-600'>{ERROR_MESSAGE}</p>
         <button
           className='mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800'
@@ -129,13 +129,13 @@ export default function DashboardPage(): JSX.Element {
   const categories = categoriesQuery.data ?? [];
 
   return (
-    <div className='space-y-8'>
+    <div className='space-y-8' data-testid='dashboard-page'>
       <div>
-        <h1 className='text-3xl font-semibold text-slate-900'>{TITLE}</h1>
+        <h1 className='text-3xl font-semibold text-slate-900' data-testid='dashboard-heading'>{TITLE}</h1>
       </div>
 
       {/* Usage Stats Card */}
-      <Card>
+      <Card data-testid='usage-card'>
         <h2 className='text-lg font-semibold text-slate-900'>{USAGE_TITLE}</h2>
         <div className='mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2'>
           <div className='rounded-lg bg-slate-50 p-4'>
@@ -167,9 +167,9 @@ export default function DashboardPage(): JSX.Element {
             <p className='text-sm text-slate-500'>{EMPTY_MESSAGE}</p>
           </Card>
         ) : (
-          <div className='mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+          <div className='mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4' data-testid='categories-grid'>
             {categories.map((category) => (
-              <Link key={category.id} href={`/category/${category.id}`}>
+              <Link key={category.id} href={`/category/${category.id}`} data-testid={`category-${category.id}`}>
                 <Card className='h-full transition hover:shadow-md hover:border-slate-300 cursor-pointer'>
                   <div className='flex flex-col'>
                     <div className='flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-2xl'>
