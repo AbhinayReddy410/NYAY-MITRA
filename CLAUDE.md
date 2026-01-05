@@ -490,6 +490,27 @@ pnpm --filter @nyayamitra/shared build
 pnpm --filter @nyayamitra/api test -- --grep "draft"
 ```
 
+## Skills Available
+
+Load a skill for focused work:
+- `@frontend` - UI/UX, React, NativeWind, accessibility
+- `@backend` - API, Supabase, security, data integrity
+- `@security` - Vulnerability scanning, dependency audit
+- `@pm` - GitHub issues, project board, sprint planning
+- `@legal` - Template parsing, variable extraction, Indian legal formats
+- `@devops` - CI/CD, Docker, deployment
+
+### How to Use
+1. Start task with skill prefix: "@frontend fix the login button styling"
+2. Claude loads relevant context and constraints
+3. Work stays focused within skill boundary
+
+### Context Isolation Rules
+- Frontend skill CANNOT modify API code
+- Backend skill CANNOT modify components
+- Each skill has explicit file scope
+- Cross-cutting concerns require skill switch
+
 ---
 
 ## REMEMBER
