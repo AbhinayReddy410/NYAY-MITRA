@@ -5,8 +5,7 @@ import { z } from 'zod/v3';
 import type { PaginatedResponse, Template } from '@nyayamitra/shared';
 
 import { notFound } from '../lib/errors';
-import { templates } from '../lib/firebase';
-import { searchTemplates } from '../lib/typesense';
+import { getSupabase } from '../lib/supabase';
 import type { ValidatedInput } from '../lib/validator';
 import { zValidator } from '../lib/validator';
 
@@ -50,37 +49,35 @@ function buildFilterBy(categoryId: string | undefined): string {
 
 async function listTemplates(c: Context<Env, string, TemplateListInput>): Promise<Response> {
   const { categoryId, search, page, limit } = c.req.valid('query');
+  const supabase = getSupabase();
+
+  const offset = (page - 1) * limit;
+  let query = supabase
+    .from('templates')
+    .select('id, name, slug, description, keywords, category_id, estimated_minutes, usage_count, created_at, is_active', { count: 'exact' })
+    .eq('is_active', true)
+    .order('name', { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (categoryId) {
+    query = query.eq('category_id', categoryId);
+  }
 
   if (search) {
-    const filterBy = buildFilterBy(categoryId);
-    const result = await searchTemplates<TemplateSummary>(search, filterBy, page, limit);
-    const totalPages = result.total === 0 ? 0 : Math.ceil(result.total / limit);
-    const response: TemplateListResponse = {
-      data: result.hits,
-      pagination: {
-        page,
-        limit,
-        total: result.total,
-        totalPages
-      }
-    };
-    return c.json(response);
+    query = query.textSearch('name', search, { type: 'websearch', config: 'english' });
   }
 
-  let query = templates().where('isActive', '==', true);
-  if (categoryId) {
-    query = query.where('categoryId', '==', categoryId);
+  const { data, count, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const countSnapshot = await query.count().get();
-  const total = countSnapshot.data().count;
-  const offset = (page - 1) * limit;
-  const snapshot = await query.offset(offset).limit(limit).get();
-  const data = snapshot.docs.map((doc) => toSummary(doc.data() as Template, doc.id));
+  const total = count || 0;
   const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
   const response: TemplateListResponse = {
-    data,
+    data: data || [],
     pagination: {
       page,
       limit,
@@ -94,18 +91,19 @@ async function listTemplates(c: Context<Env, string, TemplateListInput>): Promis
 
 async function getTemplate(c: Context<Env, string, TemplateParamInput>): Promise<Response> {
   const { id } = c.req.valid('param');
-  const doc = await templates().doc(id).get();
 
-  if (!doc.exists) {
+  const { data, error } = await getSupabase()
+    .from('templates')
+    .select('*')
+    .eq('id', id)
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) {
     throw notFound('Template not found');
   }
 
-  const template = doc.data() as Template | undefined;
-  if (!template || !template.isActive) {
-    throw notFound('Template not found');
-  }
-
-  return c.json({ data: { ...template, id: doc.id } });
+  return c.json({ data });
 }
 
 templatesRouter.get('/', zValidator('query', listQuerySchema), listTemplates);

@@ -4,11 +4,17 @@
   "private": true,
   "description": "CLI scripts for NyayaMitra administration",
   "scripts": {
-    "import-templates": "tsx import-templates.ts"
+    "import:templates": "tsx import-templates.ts",
+    "import:dry-run": "DRY_RUN=true tsx import-templates.ts",
+    "import:resume": "tsx import-templates.ts",
+    "import:supabase": "tsx import-supabase.ts",
+    "import:supabase:dry-run": "DRY_RUN=true tsx import-supabase.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
     "csv-parse": "^5.5.6",
     "docxtemplater": "^3.67.6",
+    "dotenv": "^17.2.3",
     "firebase-admin": "^13.6.0",
     "pizzip": "^3.2.0",
     "tsx": "^4.21.0",

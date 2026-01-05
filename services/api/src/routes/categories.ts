@@ -1,9 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 
-import type { Category } from '@nyayamitra/shared';
-
-import { categories } from '../lib/firebase';
+import { getSupabase } from '../lib/supabase';
 import { authMiddleware } from '../middleware/auth';
 
 export const categoriesRouter = new Hono();
@@ -11,11 +9,16 @@ export const categoriesRouter = new Hono();
 categoriesRouter.use('*', authMiddleware());
 
 async function listCategories(c: Context): Promise<Response> {
-  const snapshot = await categories().where('isActive', '==', true).orderBy('order', 'asc').get();
-  const data = snapshot.docs.map((doc) => {
-    const category = doc.data() as Category;
-    return { ...category, id: doc.id };
-  });
+  const { data, error } = await getSupabase()
+    .from('categories')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   return c.json({ data });
 }
 

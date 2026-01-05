@@ -1,30 +1,11 @@
-import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
-import type { App } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import type { Auth, DecodedIdToken } from 'firebase-admin/auth';
 import type { MiddlewareHandler } from 'hono';
 
-import { env } from '../lib/env';
+import { verifyToken } from '../lib/supabase';
 import { authRequired } from '../lib/errors';
 
 export interface AuthVariables {
-  user: DecodedIdToken;
-}
-
-function getFirebaseApp(): App {
-  const apps = getApps();
-  if (apps.length > 0) {
-    return apps[0];
-  }
-
-  return initializeApp({
-    credential: applicationDefault(),
-    projectId: env.FIREBASE_PROJECT_ID
-  });
-}
-
-function getFirebaseAuth(): Auth {
-  return getAuth(getFirebaseApp());
+  userId: string;
+  userEmail?: string;
 }
 
 export const authMiddleware = (): MiddlewareHandler => {
@@ -40,11 +21,18 @@ export const authMiddleware = (): MiddlewareHandler => {
     }
 
     try {
-      const decoded = await getFirebaseAuth().verifyIdToken(token);
-      c.set('user', decoded);
+      const user = await verifyToken(token);
+      if (!user) {
+        throw authRequired('Invalid token');
+      }
+      c.set('userId', user.id);
+      c.set('userEmail', user.email);
       await next();
-    } catch {
-      throw authRequired('Invalid token');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Invalid token')) {
+        throw authRequired('Invalid token');
+      }
+      throw authRequired();
     }
   };
 };
